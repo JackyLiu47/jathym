@@ -1,0 +1,21 @@
+{
+  "name": "jathym",
+  "version": "1.0.0",
+  "description": "self make music bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "testja"
+  },
+  "keywords": [
+    "JAP@ssw0RD"
+  ],
+  "author": "Jacky",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/opus": "^0.3.2",
+    "discord.js": "^12.2.0",
+    "ffmpeg": "0.0.4",
+    "fluent-ffmpeg": "^2.1.2",
+    "ytdl-core": "^2.1.7"
+  }
+}
