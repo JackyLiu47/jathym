@@ -3,7 +3,10 @@ const{
     prefix,
     token,
 } = require('./config.json');
-const ytdl = require('ytdl-core')
+const Util = require('discord.js');
+const ytdl = require('ytdl-core');
+const YouTube = require('simple-youtube-api');
+const youtube = new YouTube('AIzaSyCfHFxNvaG_CLLPQ0HdtjVBy9Gmkf6rjdA');
 
 //connect to the discord bot
 const client = new Discord.Client();
@@ -36,7 +39,7 @@ client.on('message', async message => {
         return;
     }
     else if (message.content.startsWith(`${prefix}stop`)){
-        stop(message, serverQueue);
+        clear(message, serverQueue);
         return;
     }
     /*else if (message.content.startsWith(`${prefix}leave`)){
@@ -49,30 +52,60 @@ client.on('message', async message => {
 
 
 //check user status and permissions
-async function execute(message, serverQueue){
-    const args = message.content.split(" ");
+async function execute(msg, serverQueue){
+    const args = msg.content.split(" ");
+    const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : '';
+    
 
-    const voiceChannel = message.member.voice.channel;
+    const voiceChannel = msg.member.voice.channel;
     if(!voiceChannel)
-        return message.channel.send(
-            "You are not in the voice channel! 您不在频道中！"
+        return msg.channel.send(
+            "You are not in the voice channel!"
         );
-    const permissions = voiceChannel.permissionsFor(message.client.user);
+    const permissions = voiceChannel.permissionsFor(msg.client.user);
     if(!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
-        return message.channel.send(
-            "I need permissions to join and speak in the channel! 我需要加入和在当前频道说话的权限！"
+        return msg.channel.send(
+            "I need permissions to join and speak in the channel!"
         );
     }
 
+    //check if url is playlist
+    if (url.match(/^https?:\/\/(www.youtube.com|youtube.com)\/playlist(.*)$/)) {
+        const playlist = await youtube.getPlaylist(url);
+        const videos = await playlist.getVideos();
+        for (const video of Object.values(videos)) {
+            const video2 = await youtube.getVideoByID(video.id); // eslint-disable-line no-await-in-loop
+            await handleVideo(video2, msg, voiceChannel, true) // eslint-disable-line no-await-in-loop
+        }
+        return msg.channel.send({embed: {
+            color: 15158332,
+            fields: [{
+                name: "✅ Added playlist",
+                value: `Playlist: **${playlist.title}** has been added to the queue!`
+              }
+            ]
+          }
+        });
+    }
+    else {
+        try{
+            var video = await youtube.getVideo(url);
+        } catch (error) {
+            console.log(`cannot find song with the url: ${err}`);
+            return message.channel.send(`cannot find song with the url: ${err}`);
+        }
+        return handleVideo(video, msg, voiceChannel);
+    }
+
     //use ytdl to get songinfo and save in song object
-    const songInfo = await ytdl.getInfo(args[1])
+    /*const songInfo = await ytdl.getInfo(args[1])
     const song = {
         title: songInfo.title,
         url: songInfo.video_url,
-    };
+    };*/
 
     //add songs into queue if queue exist
-    if (!serverQueue) {
+    /*if (!serverQueue) {
         //create a queue contruct
         const queuecontruct = {
             textChannel: message.channel,
@@ -102,8 +135,48 @@ async function execute(message, serverQueue){
         serverQueue.songs.push(song);
         console.log(serverQueue.songs);
         return message.channel.send(`${song.title} has been added to the queue!`);
-        }
+        }*/
 }
+
+//handlevideo
+async function handleVideo(video,msg,voiceChannel,playlist = false){
+    const serverQueue = queue.get(msg.guild.id);
+    const song = {
+        id: video.id,
+        title: Util.escapeMarkdown(video.title),
+        url: `https://www.youtube.com/watch?v=${video.id}`
+    };
+    if(!serverQueue) {
+        const queueConstruct = {
+            textChannel: msg.channel,
+            voiceChannel: voiceChannel,
+            connection: null,
+            songs: [],
+            volume: 5,
+            playing: true
+        };
+        queue.set(msg.guild.id, queueConstruct);
+        queueConstruct.songs.push(song);
+
+        try{
+            var connection = await voiceChannel.join();
+            queueConstruct.connection = connection;
+            play(msg.guild,queueConstruct.songs[0]);
+        }
+        catch (error) {
+            console.error(`could not join the voicechannel: ${error}`);
+            queue.delete(msg.guild.id);
+            return msg.channel.send(`could not join the voice channel: ${error}`);
+        }
+    }
+    else{
+        serverQueue.songs.push(song);
+        if(playlist) return undefined;
+        else return msg.channel.send(`*${song.title}* has been added to the queue`);
+    }
+    return undefined;
+}
+
 //create a play function
 function play(guild, song) {
     const serverQueue = queue.get(guild.id);
@@ -117,6 +190,7 @@ function play(guild, song) {
     const dispatcher = serverQueue.connection
         .play(ytdl(song.url))
         .on("finish",() => {
+            console.log('Song ended.');
             serverQueue.songs.shift();
             play(guild,serverQueue.songs[0]);
         })
@@ -125,18 +199,19 @@ function play(guild, song) {
     serverQueue.textChannel.send(`Start playing: **${song.title}**`);
 }
 //create a skip function
-function skip(message,serverQueue){
-    if(!message.member.voice.channel)
-        return message.channel.send("You are not in the channel! 您不在语音频道中！");
+function skip(msg,serverQueue){
+    console.log(`${msg.author.tag} has been used skip command in ${msg.guild.name}`)
+    if(!msg.member.voice.channel)
+        return msg.channel.send("You are not in the channel!");
     if(!serverQueue)
-        return message.channel.send("The queue is empty! 列表为空！");
+        return msg.channel.send("The queue is empty!");
     serverQueue.connection.dispatcher.end();
 }
-//stop function
-function stop(message, serverQueue) {
+//clear function
+function clear(message, serverQueue) {
     if(!message.member.voice.channel)
-        return message.channel.send("You are not in the channel! 您不在语音频道中！");
-    message.channel.send("Seeya~~");
+        return message.channel.send("You are not in the channel!");
+    message.channel.send("Queue was cleared, Seeya~~");
     serverQueue.songs = [];
     serverQueue.connection.dispatcher.end();
     

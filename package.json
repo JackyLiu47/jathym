@@ -7,7 +7,7 @@
     "test": "testja"
   },
   "keywords": [
-    "JAP@ssw0RD"
+    "your_password"
   ],
   "author": "Jacky",
   "license": "ISC",
@@ -16,6 +16,8 @@
     "discord.js": "^12.2.0",
     "ffmpeg": "0.0.4",
     "fluent-ffmpeg": "^2.1.2",
+    "simple-youtube-api": "^5.2.1",
+    "youtube": "^0.1.0",
     "ytdl-core": "^2.1.7"
   }
 }
