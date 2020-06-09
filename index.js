@@ -6,7 +6,7 @@ const{
 const Util = require('discord.js');
 const ytdl = require('ytdl-core');
 const YouTube = require('simple-youtube-api');
-const youtube = new YouTube('AIzaSyCfHFxNvaG_CLLPQ0HdtjVBy9Gmkf6rjdA');
+const youtube = new YouTube('your_api_key');
 
 //connect to the discord bot
 const client = new Discord.Client();
