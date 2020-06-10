@@ -6,7 +6,7 @@ const{
 const Util = require('discord.js');
 const ytdl = require('ytdl-core');
 const YouTube = require('simple-youtube-api');
-const youtube = new YouTube('api_token');
+const youtube = new YouTube('your_api_key');
 
 //connect to the discord bot
 const client = new Discord.Client();
@@ -64,7 +64,7 @@ client.on('message', async msg => {
 async function execute(msg, serverQueue){
     const args = msg.content.split(" ");
     const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : '';
-    const serch = args.slice(1).join(' ');
+    const searchString = args.slice(1).join(' ');
 
     const voiceChannel = msg.member.voice.channel;
     if(!voiceChannel)
@@ -97,11 +97,61 @@ async function execute(msg, serverQueue){
         });
     }
     else {
-        try{
+        try {
             var video = await youtube.getVideo(url);
         } catch (error) {
             console.log(`cannot find song as a url, try search`);
-            return msg.channel.send(`Cannot find song with the url: ${err}`);
+            try {
+                var videos = await youtube.searchVideos(searchString, 10);
+                let index = 0;
+                msg.channel.send({embed: {
+                    color: 15158332,
+                    fields: [{
+                        name: "📋 Song selection",
+                        value: `${videos.map(video2 => `\`${++index}\` **-** ${video2.title}`).join('\n')}`
+                      },
+                      {
+                          name: "You have 10 seconds!",
+                          value: "Provide a value to select on of the search results ranging from 1-10."
+                      }
+                    ]
+                  }
+                });
+                // eslint-disable-next-line max-depth
+                try {
+                    var response = await msg.channel.awaitMessages(msg2 => msg2.content > 0 && msg2.content < 11, {
+                        max: 1,
+                        time: 10000,
+                        errors: ['time']
+                    });
+                    console.log(`get message response ${response.content}`)
+                } catch (err) {
+                    console.error(err);
+                    return msg.channel.send({embed: {
+                        color: 15158332,
+                        fields: [{
+                            name: "❌ Error",
+                            value: 'No or invalid value entered, cancelling video selection...'
+                          }
+                        ]
+                      }
+                    });
+                }
+                const videoIndex = (response.first().content);
+                var video = await youtube.getVideoByID(videos[videoIndex - 1].id);
+            } catch (err) {
+                console.error(err);
+                return msg.channel.send({embed: {
+                    color: 15158332,
+                    fields: [{
+                        name: "❌ Error",
+                        value: 'I could not obtain any search results.'
+                      }
+                    ]
+                  }
+                });
+            }
+            //return msg.channel.send(`Cannot find song with the url: ${err}`);
         }
         return handleVideo(video, msg, voiceChannel);
     }
