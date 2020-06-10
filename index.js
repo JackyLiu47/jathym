@@ -6,7 +6,7 @@ const{
 const Util = require('discord.js');
 const ytdl = require('ytdl-core');
 const YouTube = require('simple-youtube-api');
-const youtube = new YouTube('your_api_token');
+const youtube = new YouTube('api_token');
 
 //connect to the discord bot
 const client = new Discord.Client();
@@ -51,8 +51,11 @@ client.on('message', async msg => {
     else if (msg.content.startsWith(`${prefix}resume`)){
         resume(msg,serverQueue);
     }
+    else if (msg.content.startsWith(`${prefix}help`)){
+        help(msg,serverQueue);
+    }
     else {
-        msg.channel.send("You need to enter a valid command!");
+        return msg.channel.send("You need to enter a valid command!");
     }
 });
 
@@ -61,7 +64,7 @@ client.on('message', async msg => {
 async function execute(msg, serverQueue){
     const args = msg.content.split(" ");
     const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : '';
-    
+    const serch = args.slice(1).join(' ');
 
     const voiceChannel = msg.member.voice.channel;
     if(!voiceChannel)
@@ -80,13 +83,13 @@ async function execute(msg, serverQueue){
         const playlist = await youtube.getPlaylist(url);
         const videos = await playlist.getVideos();
         for (const video of Object.values(videos)) {
-            const video2 = await youtube.getVideoByID(video.id); // eslint-disable-line no-await-in-loop
-            await handleVideo(video2, msg, voiceChannel, true) // eslint-disable-line no-await-in-loop
+            const video2 = await youtube.getVideoByID(video.id);
+            await handleVideo(video2, msg, voiceChannel, true) 
         }
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "✅ Added playlist",
+                name: "✅ **PLAYLIST ADDED**",
                 value: `Playlist: **${playlist.title}** has been added to the queue!`
               }
             ]
@@ -97,51 +100,11 @@ async function execute(msg, serverQueue){
         try{
             var video = await youtube.getVideo(url);
         } catch (error) {
-            console.log(`cannot find song with the url: ${err}`);
-            return msg.channel.send(`cannot find song with the url: ${err}`);
+            console.log(`cannot find song as a url, try search`);
+            return msg.channel.send(`Cannot find song with the url: ${err}`);
         }
         return handleVideo(video, msg, voiceChannel);
     }
-
-    //use ytdl to get songinfo and save in song object
-    /*const songInfo = await ytdl.getInfo(args[1])
-    const song = {
-        title: songInfo.title,
-        url: songInfo.video_url,
-    };*/
-
-    //add songs into queue if queue exist
-    /*if (!serverQueue) {
-        //create a queue contruct
-        const queuecontruct = {
-            textChannel: msg.channel,
-            voiceChannel:voiceChannel,
-            connection: null,
-            songs:[],
-            volume: 5,
-            playing: true,
-        };
-        //use the contruct
-        queue.set(msg.guild.id, queuecontruct);
-        // Pushing the songs into the queue
-        queuecontruct.songs.push(song);
-
-        try{
-            //try join the voicechannel and save connection into the object
-            var connection = await voiceChannel.join();
-            queuecontruct.connection = connection;
-            play(msg.guild, queuecontruct.songs[0]);
-        }
-        catch(err) {
-            console.log(err);
-            queue.delete(msg.guild.id);
-            return msg.channel.send(err);
-        }
-    } else {
-        serverQueue.songs.push(song);
-        console.log(serverQueue.songs);
-        return msg.channel.send(`${song.title} has been added to the queue!`);
-        }*/
 }
 
 //handlevideo
@@ -172,13 +135,29 @@ async function handleVideo(video,msg,voiceChannel,playlist = false){
         catch (error) {
             console.error(`could not join the voicechannel: ${error}`);
             queue.delete(msg.guild.id);
-            return msg.channel.send(`could not join the voice channel: ${error}`);
+            return msg.channel.send({embed: {
+                color: 15158332,
+                fields: [{
+                    name: "❌ **Error**",
+                    value: `Could not join the voice channel: ${error}`
+                  }
+                ]
+              }
+            });
         }
     }
     else{
         serverQueue.songs.push(song);
         if(playlist) return undefined;
-        else return msg.channel.send(`*${song.title}* has been added to the queue`);
+        else return msg.channel.send({embed: {
+                color: 15158332,
+                fields: [{
+                    name: "✅ **MUSIC ADDED**",
+                    value: `*${song.title}* has been added to the queue`
+                }
+                ]
+            }
+            }) 
     }
     return undefined;
 }
@@ -218,8 +197,25 @@ function skip(msg,serverQueue){
 function stop(msg, serverQueue) {
     console.log(`${msg.author.tag} has been used stop command in ${msg.guild.name}`)
     if(!msg.member.voice.channel)
-        return msg.channel.send("You are not in the channel!");
-    msg.channel.send("Queue was cleared, Seeya~~");
+        return msg.channel.send({embed: {
+            color: 15158332,
+            fields: [{
+                name: "❌ **ERROR**",
+                value: 'You are not in the voice channel'
+              }
+            ]
+          }
+        });
+    msg.channel.send({embed: {
+        color: 15158332,
+        fields: [{
+            name: "👋 **Bye Bye!**",
+            value: 'Queue was cleared, Seeya~~😘'
+            }
+        ]
+        }
+    });
+    //msg.channel.send("Queue was cleared, Seeya~~😘");
     serverQueue.songs = [];
     serverQueue.connection.dispatcher.end();
     
@@ -228,12 +224,20 @@ function stop(msg, serverQueue) {
 function now(msg, serverQueue) {
     console.log(`${msg.author.tag} has been used now command in ${msg.guild.name}`)
     if(!msg.member.voice.channel)
-        return msg.channel.send("You are not in the channel!");
+        return msg.channel.send({embed: {
+            color: 15158332,
+            fields: [{
+                name: "❌ **ERROR**",
+                value: 'You are not in the voice channel'
+              }
+            ]
+          }
+        });
     if(!serverQueue)
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "❌ Error",
+                name: "❌ **ERROR**",
                 value: 'There is nothing playing that I could skip for you.'
               }
             ]
@@ -242,7 +246,7 @@ function now(msg, serverQueue) {
     return msg.channel.send({embed: {
         color: 15158332,
         fields: [{
-            name: "🎶 Now Playing",
+            name: "🎶 **NOW PLAYING**",
             value: `**${serverQueue.songs[0].title}**`
           }
         ]
@@ -256,7 +260,7 @@ function pause(msg, serverQueue) {
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "❌ Error",
+                name: "❌ **ERROR**",
                 value: 'You are not in the voice channel'
               }
             ]
@@ -266,7 +270,7 @@ function pause(msg, serverQueue) {
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "❌ Error",
+                name: "❌ **ERROR**",
                 value: 'There is nothing playing'
               }
             ]
@@ -278,7 +282,7 @@ function pause(msg, serverQueue) {
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "⏯️ Pause",
+                name: "⏯️ **PAUSE**",
                 value: `I have paused **${serverQueue.songs[0].title}** for you!`
               }
             ]
@@ -303,7 +307,7 @@ function resume(msg, serverQueue) {
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "❌ Error",
+                name: "❌ **ERROR**",
                 value: 'There is nothing playing'
               }
             ]
@@ -315,7 +319,7 @@ function resume(msg, serverQueue) {
         return msg.channel.send({embed: {
             color: 15158332,
             fields: [{
-                name: "▶️ Resume",
+                name: "▶️ **RESUME**",
                 value: `I have resumed **${serverQueue.songs[0].title}** for you!`
               }
             ]
@@ -325,19 +329,32 @@ function resume(msg, serverQueue) {
     else return msg.channel.send({embed: {
         color: 15158332,
         fields: [{
-            name: "❌ Error",
+            name: "❌ **ERROR**",
             value: `It's already playing, enjoy it😘`
           }
         ]
       }
     });
 }
-//leave function
-/*function leave(msg, serverQueue){
-    serverQueue.songs = [];
-    serverQueue.connection.dispatcher.end();
-    msg.channel.send("Seeya~~");
-    msg.member.voice.channel.leave();
-    queue.delete(msg.guild.id);
-}*/
+//help function
+function help(msg,serverQueue) {
+    console.log(`${msg.author.tag} has been used the help command in ${msg.guild.name}`);
+    msg.channel.send({embed: {
+        color: 15158332,
+        fields: [{
+            name: "✅ **COMMAND LIST**",
+            value: `The prefix of the bot is ${prefix}\n
+                    **${prefix}help**  ---- Show the command list.\n
+                    **${prefix}play**  ---- Play a song from Youtube song or playlist url.\n
+                    **${prefix}pause** ---- Pause the music.\n
+                    **${prefix}resume**---- Resume the music.\n
+                    **${prefix}now**   ---- Show the music now playing.\n
+                    **${prefix}skip**  ---- Skip to the next song.\n
+                    **${prefix}stop**  ---- Stop and leave the channel`
+          }
+        ]
+      }
+    });
+}
+
 client.login(token);
